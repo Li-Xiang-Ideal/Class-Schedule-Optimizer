@@ -1,0 +1,12 @@
+NULL	微分流形	NULL
+2982	NULL	NULL
+0800	NULL	NULL
+0816	NULL	NULL
+NULL	理论力学	NULL
+NULL	线性代数	李明
+NULL	思想道德修养与法律基础专题	NULL
+NULL	物理研讨4-1	NULL
+NULL	英语综合技能2-1	NULL
+NULL	语言、文化及交流2-1	NULL
+NULL	大学语文（理工类）	NULL
+break
