@@ -18,9 +18,9 @@
 
 using namespace std;
 
-#include"lib\class_data.h"
-#include"lib\class_arrg.h"
-#include"lib\class_io.h"
+#include"class\class_data.h"
+#include"class\class_arrg.h"
+#include"class\class_io.h"
 
 #define N 2201   //八里台2201 津南1431 
 
