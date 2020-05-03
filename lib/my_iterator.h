@@ -72,22 +72,23 @@ namespace my_lib
     template<typename _Tp>
     struct __iterator_traits<_Tp*>
     {
-        typedef typename random_access_iterator_tag     iterator_category;
-        typedef typename _Tp                            value_type;
-        typedef typename ptrdiff_t                      difference_type;
-        typedef typename _Tp*                           pointer;
-        typedef typename _Tp&                           reference;
+        //tips:通常来说, 没有作用域符号::的地方不需要typedef typename, 直接typedef即可
+        typedef random_access_iterator_tag  iterator_category;
+        typedef _Tp                         value_type;
+        typedef ptrdiff_t                   difference_type;
+        typedef _Tp*                        pointer;
+        typedef _Tp&                        reference;
     };
 
     //对const原生指针偏特化
     template<typename _Tp>
     struct __iterator_traits<const _Tp*>
     {
-        typedef typename random_access_iterator_tag     iterator_category;
-        typedef typename _Tp                            value_type;
-        typedef typename ptrdiff_t                      difference_type;
-        typedef typename _Tp*                           pointer;
-        typedef typename _Tp&                           reference;
+        typedef random_access_iterator_tag  iterator_category;
+        typedef _Tp                         value_type;
+        typedef ptrdiff_t                   difference_type;
+        typedef _Tp*                        pointer;
+        typedef _Tp&                        reference;
     };
 
     //通过继承对_Iterator进行类型推断, 获得iterator_traits
