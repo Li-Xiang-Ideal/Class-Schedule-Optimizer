@@ -34,13 +34,13 @@
 
 #include <bits/c++config.h>
 #include <bits/postypes.h>
-#include <iostream>
+//#include <iostream>
 
 namespace my_lib
 {
     //用两个结构体代替true&false, 用于参数类型推断
-    struct __true_type { };
-    struct __false_type { };
+    struct __true_type { static const bool value = true; };
+    struct __false_type { static const bool value = false; };
 
     //主模板non-trivial
     template<typename _Tp>
@@ -220,7 +220,37 @@ namespace my_lib
         typedef __true_type     _is_POD_type;
     };
 
-    //inline函数获得_has_trivial_default_constructor
+    
+    //以下一组示性类均为对typename(而非具体对象)给出traits对应的typename(而非临时对象)
+
+    //type_traits<_Tp>::_has_trivial_default_constructor
+    template<typename _Tp> struct has_trivial_default_constructor 
+    : public type_traits<_Tp>::_has_trivial_default_constructor { };
+
+    //type_traits<_Tp>::_has_trivial_copy_constructor
+    template<typename _Tp> 
+    struct has_trivial_copy_constructor 
+    : public type_traits<_Tp>::_has_trivial_copy_constructor { };
+
+    //type_traits<_Tp>::_has_trivial_assignment_operator
+    template<typename _Tp> 
+    struct has_trivial_assignment_operator 
+    : public type_traits<_Tp>::_has_trivial_assignment_operator { };
+
+    //type_traits<_Tp>::_has_trivial_destructor
+    template<typename _Tp> 
+    struct has_trivial_destructor 
+    : public type_traits<_Tp>::_has_trivial_destructor { };
+
+    //type_traits<_Tp>::_is_POD_type
+    template<typename _Tp> 
+    struct is_POD_type 
+    : public type_traits<_Tp>::_is_POD_type { };
+
+
+    //以下一组示性函数均为对具体对象(而非typename)返回一临时对象(而非typename)
+
+    //inline函数获得当前object的_has_trivial_default_constructor(作为object而非typename)
     template<typename _Tp>
     inline typename type_traits<_Tp>::_has_trivial_default_constructor
     _has_trivial_default_constructor(const _Tp&)
@@ -231,7 +261,7 @@ namespace my_lib
         return _has_trivial_default_constructor(); //括号用于生成临时对象
     }
 
-    //_has_trivial_copy_constructor
+    //获得当前object的_has_trivial_copy_constructor(作为object而非typename)
     template<typename _Tp>
     inline typename type_traits<_Tp>::_has_trivial_copy_constructor
     _has_trivial_copy_constructor(const _Tp&)
@@ -241,7 +271,7 @@ namespace my_lib
         return _has_trivial_copy_constructor();
     }
 
-    //_has_trivial_assignment_operator
+    //获得当前object的_has_trivial_assignment_operator(作为object而非typename)
     template<typename _Tp>
     inline typename type_traits<_Tp>::_has_trivial_assignment_operator
     _has_trivial_assignment_operator(const _Tp&)
@@ -251,7 +281,7 @@ namespace my_lib
         return _has_trivial_assignment_operator();
     }
 
-    //_has_trivial_destructor
+    //获得当前object的_has_trivial_destructor(作为object而非typename)
     template<typename _Tp>
     inline typename type_traits<_Tp>::_has_trivial_destructor
     _has_trivial_destructor(const _Tp&)
@@ -261,7 +291,7 @@ namespace my_lib
         return _has_trivial_destructor();
     }
 
-    //_is_POD_type
+    //获得当前object的_is_POD_type(作为object而非typename)
     template<typename _Tp>
     inline typename type_traits<_Tp>::_is_POD_type
     _is_POD_type(const _Tp&)
@@ -269,6 +299,54 @@ namespace my_lib
         typedef typename type_traits<_Tp>::_is_POD_type _is_POD_type;
         return _is_POD_type();
     }
+
+
+    //以下一组示性函数均为对具体对象(而非typename)返回具体值(bool)
+
+    //inline函数获得当前object的_has_trivial_default_constructor值(bool)
+    template<typename _Tp>
+    inline bool ___has_trivial_default_constructor(const _Tp&)
+    {
+        typedef typename type_traits<_Tp>::_has_trivial_default_constructor 
+            _has_trivial_default_constructor;
+        return _has_trivial_default_constructor().value;
+    }
+
+    //获得当前object的_has_trivial_copy_constructor值(bool)
+    template<typename _Tp>
+    inline bool ___has_trivial_copy_constructor(const _Tp&)
+    {
+        typedef typename type_traits<_Tp>::_has_trivial_copy_constructor 
+            _has_trivial_copy_constructor;
+        return _has_trivial_copy_constructor().value;
+    }
+
+    //获得当前object的_has_trivial_assignment_operator值(bool)
+    template<typename _Tp>
+    inline bool ___has_trivial_assignment_operator(const _Tp&)
+    {
+        typedef typename type_traits<_Tp>::_has_trivial_assignment_operator 
+            _has_trivial_assignment_operator;
+        return _has_trivial_assignment_operator().value;
+    }
+
+    //获得当前object的_has_trivial_destructor值(bool)
+    template<typename _Tp>
+    inline bool ___has_trivial_destructor(const _Tp&)
+    {
+        typedef typename type_traits<_Tp>::_has_trivial_destructor
+            _has_trivial_destructor;
+        return _has_trivial_destructor().value;
+    }
+
+    //获得当前object的_is_POD_type值(bool)
+    template<typename _Tp>
+    inline bool ___is_POD_type(const _Tp&)
+    {
+        typedef typename type_traits<_Tp>::_is_POD_type _is_POD_type;
+        return _is_POD_type().value;
+    }
+
     
 } // namespace my_lib
 
