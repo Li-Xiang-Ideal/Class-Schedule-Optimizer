@@ -18,7 +18,7 @@
 /************************************************************
  * 说明: 
  * 本文件包含一个空间配置器, 对_has_trivial_destructor进行了优
- * 化. 二级空间配置器待添加. 
+ * 化. 对小于128bytes的片段使用二级空间配置器. 
  * 本文件参考了侯捷《STL源码剖析》, 特此说明并致谢
  ***********************************************************/
 
@@ -26,28 +26,32 @@
  * 更新日志:
  * 2020.04.14 对_has_trivial_destructor进行了优化
  * 2020.05.02 对部分代码进行了调整
+ * 2020.05.04 重写了_destroy(), 提高了代码效率
+ * 2020.05.17 添加了二级空间配置器sub_allocator
+ * 2020.05.19 添加了operator==与!=, 提高了兼容性
  ***********************************************************/
 
 #ifndef MY_ALLOC
 #define MY_ALLOC
 
 #include <new>
-/*
-#include <cstddef>
 #include <cstdlib>
-#include <cstdio>
-#include <climits>
 #include <iostream>
-#include <memory> //*/
 #include <bits/c++config.h>
 #include <bits/functexcept.h>
+
 #include <bits/move.h>
+#include <bits/postypes.h>
+#include <memory>
 #if __cplusplus >= 201103L
 //#include <type_traits>
 #endif
 
 #include "my_type_traits.h"
 #include "my_iterator.h"
+#include "my_memory.h"
+
+#define USE_SUB_ALLOCATOR
 
 namespace my_lib
 {
@@ -141,6 +145,10 @@ namespace my_lib
         __destroy(_first, _last, _has_trivial_destructor(_Value_type())); /* 括号用于生成临时对象 */
     }
 
+    // STL对char*与wchar_t*设计了特化的_destroy(), 此处模仿之设置char*与wchar_t*的特化
+    inline void _destroy(char*, char*) { }
+    inline void _destroy(wchar_t*, wchar_t*) { }
+
 #else
     // construct的实现, 直接调用对象的无参构造函数
     template<typename _Tp1>
@@ -187,12 +195,30 @@ namespace my_lib
         typedef std::true_type propagate_on_container_move_assignment;
 #endif
 
+#ifndef USE_SUB_ALLOCATOR
         // allocate, deallocate, construct和destroy函数均调用上面的实际实现
         // hint used for locality. ref.[Austern],p189
         pointer allocate(size_type _n, const void* hint = 0) {
             return _allocate((difference_type)_n, (pointer)0);
         }
         void deallocate(pointer _p, size_type _n) { _deallocate(_p); }
+
+#else
+        // Enable sub_allocator for size<=128bytes
+        pointer allocate(size_type _n, const void* hint = 0) 
+        {
+            if (_n * sizeof(value_type) > 128) 
+            { return _allocate((difference_type)_n, (pointer)0); }
+            else { return _sub_allocate((difference_type)_n, (pointer)0); }
+        }
+        void deallocate(pointer _p, size_type _n) 
+        { 
+            if (_n * sizeof(value_type) > 128)  { _deallocate(_p);  }
+            else { _sub_deallocate(_p, _n); }
+        }
+        //建议:在memory_pool中定义dealloc为
+        //若指针是memory_pool指针则返回NULL,否则返回原指针,然后_deallocate(dealloc(_p))
+#endif
 
 #if __cplusplus >= 201103L
         void construct(pointer _p) { _construct(_p); }
@@ -211,11 +237,33 @@ namespace my_lib
         void destroy(pointer _p) { _destroy(_p); }
 #endif
 
-        pointer address(reference _x) const { return (pointer)&_x; }
-        const_pointer const_address(const_reference _x) { return (const_pointer)&_x; }
-
-        size_type max_size() const { return size_type(UINT_MAX / sizeof(_Tp)); }   
+        pointer address(reference _x) const _GLIBCXX_NOEXCEPT { return (pointer)&_x; }
+        const_pointer const_address(const_reference _x) const _GLIBCXX_NOEXCEPT 
+        { return (const_pointer)&_x; }
+        size_type max_size() const _GLIBCXX_NOEXCEPT { return size_type(UINT_MAX / sizeof(_Tp)); }   
     };
+
+    // 以下代码在vector.tcc中有用, 不可删去
+    template<typename _T1, typename _T2>
+    inline bool
+    operator==(const allocator<_T1>&, const allocator<_T2>&)
+    { return true; }
+
+    template<typename _Tp>
+    inline bool
+    operator==(const allocator<_Tp>&, const allocator<_Tp>&)
+    { return true; }
+
+    template<typename _T1, typename _T2>
+    inline bool
+    operator!=(const allocator<_T1>&, const allocator<_T2>&)
+    { return false; }
+
+    template<typename _Tp>
+    inline bool
+    operator!=(const allocator<_Tp>&, const allocator<_Tp>&)
+    { return false; }
+
 } // namespace my_alloc
 
 #endif // MY_ALLOC
