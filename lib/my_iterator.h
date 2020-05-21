@@ -33,9 +33,9 @@
 
 #define __MY_LIB_TEMPLATE_NULL template<>
 
+#include <cstdlib>
 #include <bits/c++config.h>
-#include <bits/postypes.h>
-#include <iostream>
+#include <bits/functexcept.h>
 
 namespace my_lib
 {
