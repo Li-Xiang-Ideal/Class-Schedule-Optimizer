@@ -1,7 +1,7 @@
 /**********************************************************
  * 
  *                        My Lib 
- *                      my_memory.h
+ *                    my_alloc_mem.h
  * 
  *               Copyright (C) 2020 李想
  * Released under the GNU General Public License Version 3
@@ -17,18 +17,19 @@
 
 /************************************************************
  * 说明: 
- * 本文件包含一个二级空间配置器, 与STL中代码基本相同, 仅做略微
- * 调整. 主要添加了自动调整分配空间大小的功能.
+ * 本文件包含一个二级空间配置器, 使用一系列内存池和16个freelist
+ * 进行空间配置, 并添加了相对详尽的注释以备温习或查阅. 与STL相比
+ * 主要添加了根据标准差自动调整分配空间大小的功能.
  * 本文件参考了侯捷《STL源码剖析》, 特此说明并致谢
  ***********************************************************/
 
 /************************************************************
  * 更新日志:
- * 2020.05.17 添加了自动调整分配空间大小的功能.
+ * 2020.05.17 添加了根据标准差自动调整分配空间大小的功能.
  ***********************************************************/
 
-#ifndef MY_MEMORY
-#define MY_MEMORY
+#ifndef MY_ALLOC_MEM
+#define MY_ALLOC_MEM
 
 #include <new>
 #include <cstdlib>
@@ -36,14 +37,26 @@
 #include <bits/c++config.h>
 #include <bits/functexcept.h>
 
+#include "my_algobase.h"
+
 #define USE_SUB_ALLOCATOR_STAT
 
-#define max(a,b) ((a)>(b)?(a):(b))
+#define SUB_ALLOC_SIZE 0x0400 // max size of sub_allocator
+
+//#define max(a,b) ((a)>(b)?(a):(b))
 
 namespace my_lib
 {
-    //allocator将memory_pool作为静态成员 //或作为成员, 内存池作静态成员?
-    class sub_allocator    // Freelist of 8,16,24,32,40,48,56,64,72,80,88,96,104,112,120,128 bytes
+    // 使用inline函数封装sub_allocator. 本文件同时定义了一个类模板sub_allocator, 但未使用
+    template<typename _Tp> 
+    inline _Tp* _sub_allocate(ptrdiff_t size, _Tp*);
+
+    template <typename _Tp> 
+    inline void _sub_deallocate(_Tp* __p, size_t _n);
+    
+
+    // allocator_memory
+    class allocator_memory    // Freelist of 8,16,24,32,40,48,56,64,72,80,88,96,104,112,120,128 bytes
     {
     protected:
         //free_list参数
@@ -62,7 +75,7 @@ namespace my_lib
         static size_t ROUND_UP(size_t bytes) { return (((bytes) + __ALIGN - 1) & ~(__ALIGN - 1)); }
 
         //将bytes_to_get调至1KB以上
-        static size_t CEIL_UP(size_t bytes) { return max(bytes,0x0400); }
+        static size_t CEIL_UP(size_t bytes) { return max(bytes,(size_t)0x0400); }
 
         //free_lists
         static obj* volatile free_list[__NFREELISTS];
@@ -235,21 +248,21 @@ namespace my_lib
 
 #ifdef SUB_ALLOCATOR_NO_DELETE
 
-        //此版本的sub_allocator没有大小限制, 但无法释放内存
-        sub_allocator(){}
-        ~sub_allocator(){}
+        //此版本的allocator_memory没有大小限制, 但无法释放内存
+        allocator_memory(){}
+        ~allocator_memory(){}
         
 #else
-        //此版本的sub_allocator有大小限制, 可以释放内存
-        sub_allocator() 
+        //此版本的allocator_memory有大小限制, 可以释放内存
+        allocator_memory() 
         {
-            begin_pool = new char*[0x0400]; //sub_allocator的最大容量为1MB
+            begin_pool = new char*[0x0400]; //allocator_memory的最大容量为1MB
             end_pool = begin_pool;
         }
-        ~sub_allocator(){}
+        ~allocator_memory(){}
 
         //手动释放内存
-        void delete_sub_allocator() 
+        void delete_allocator_memory() 
         {
             //之所以要区分自动与手动释放内存, 是为了在手动模式下脱离实例化进行空间配置
             char** iter = begin_pool;
@@ -265,7 +278,7 @@ namespace my_lib
             obj* volatile *this_free_list;
             obj* result;
 
-            //超出sub_allocator范围
+            //超出allocator_memory范围
             if (size > (size_t)__MAX_BYTES) 
             { std::cerr << "memory error" << std::endl; exit(1); }
 
@@ -286,7 +299,7 @@ namespace my_lib
             obj* q = (obj*)p;
             obj* volatile *this_free_list;
 
-            //超出sub_allocator范围
+            //超出allocator_memory范围
             if (_n > (size_t)__MAX_BYTES) 
             { std::cerr << "memory error" << std::endl; exit(1); }
 
@@ -300,42 +313,64 @@ namespace my_lib
     };
 
     //初始化
-    char* sub_allocator::begin_free = 0;
+    char* allocator_memory::begin_free = 0;
 
-    char* sub_allocator::end_free = 0;
+    char* allocator_memory::end_free = 0;
 
-    size_t sub_allocator::heap_size = 0;
+    size_t allocator_memory::heap_size = 0;
 
-    char** sub_allocator::begin_pool = 0;
+    char** allocator_memory::begin_pool = 0;
 
-    char** sub_allocator::end_pool = 0;
+    char** allocator_memory::end_pool = 0;
 
-    size_t sub_allocator::freelist_frequency = 0;
+    size_t allocator_memory::freelist_frequency = 0;
 
-    float sub_allocator::freelist_sigma = 4;
+    float allocator_memory::freelist_sigma = 4;
 
-    sub_allocator::obj* volatile sub_allocator::free_list[__NFREELISTS] = 
+    allocator_memory::obj* volatile allocator_memory::free_list[__NFREELISTS] = 
         {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
-    size_t sub_allocator::freelist_freq[__NFREELISTS] = 
+    size_t allocator_memory::freelist_freq[__NFREELISTS] = 
         {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 
-    //封装sub_allocator
+    // sub_allocator, with template _Tp, 不过并没有用上
+    template<typename _Tp>
+    class sub_allocator
+    {
+        typedef _Tp                 value_type;
+        typedef _Tp*                pointer;
+        typedef _Tp&                reference;
+        typedef allocator_memory    _Alloc;
 
-    // sub_allocate的实现, 简单封装sub_allocator::allocate()
+    public:
+        sub_allocator(){}
+        ~sub_allocator(){}
+
+        // sub_allocate的实现, 简单封装allocator_memory::allocate()
+        pointer allocate(ptrdiff_t size, pointer) 
+        { return (pointer)_Alloc::allocate((size_t)size*sizeof(value_type)); }
+
+        // sub_deallocate的实现, 简单封装allocator_memory::deallocate()
+        void deallocate(pointer __p, size_t _n) 
+        { _Alloc::deallocate(__p, _n); }
+    };
+
+    // _sub_allocate的实现, 简单封装sub_allocator::allocate()
     template<typename _Tp>
     inline _Tp* _sub_allocate(ptrdiff_t size, _Tp*) 
-    { return (_Tp*)sub_allocator::allocate((size_t)size*sizeof(_Tp)); }
+    { return (_Tp*)allocator_memory::allocate((size_t)size*sizeof(_Tp)); }
 
-    // sub_deallocate的实现, 简单封装sub_allocator::deallocate()
+    // _sub_deallocate的实现, 简单封装sub_allocator::deallocate()
     template <typename _Tp>
     inline void _sub_deallocate(_Tp* __p, size_t _n) 
-    { sub_allocator::deallocate(__p, _n); }
+    { allocator_memory::deallocate(__p, _n); } //*/
     
     
-} // namespace my_memory
+} // namespace my_lib
+
+#undef SUB_ALLOC_SIZE
 
 #undef max
 
-#endif // MY_MEMORY
+#endif // MY_ALLOC_MEM
