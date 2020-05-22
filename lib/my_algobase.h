@@ -26,6 +26,7 @@
 /************************************************************
  * 更新日志:
  * 2020.05.21 添加了部分功能函数
+ * 2020.05.22 添加了部分功能函数
  ***********************************************************/
 
 #ifndef MY_ALGOBASE
@@ -40,6 +41,8 @@
 
 namespace my_lib
 {
+    // 基础数据处理函数, 不涉及容器与内存写入
+
     // min(a,b)
     template<typename _Tp>
     inline const _Tp&
@@ -74,7 +77,7 @@ namespace my_lib
     //inline const size_t&
     //max(const size_t& __a, const size_t& __b) { return (__a < __b ? __b : __a); }
 
-    // min(a,b) for given compare(a,b) (true if a < b)
+    // min(a,b) for given compare(a,b) (true if a < b) __comp() 为仿函数
     template<typename _Tp, typename _Compare>
     inline const _Tp&
     min(const _Tp& __a, const _Tp& __b, _Compare __comp)
@@ -84,7 +87,7 @@ namespace my_lib
         else { return __a; }
     }
 
-    // max(a,b) for given compare(a,b) (true if a < b)
+    // max(a,b) for given compare(a,b) (true if a < b) __comp() 为仿函数
     template<typename _Tp, typename _Compare>
     inline const _Tp&
     max(const _Tp& __a, const _Tp& __b, _Compare __comp)
@@ -122,7 +125,7 @@ namespace my_lib
 	    }
     };
 
-    // equal [first1,last1)==[first2,first2+(last1-first1))
+    // equal [first1,last1)==[first2,first2+(last1-first1)) 判断两个序列是否相等
     template<typename _Input_Iter1, typename _Input_Iter2>
     inline bool
     equal(_Input_Iter1 __first1, _Input_Iter1 __last1, _Input_Iter2 __first2)
@@ -138,7 +141,7 @@ namespace my_lib
         return __equal_aux<__simple>::__equal(__first1, __last1, __first2);
     }
 
-    // equal [first1,last1)==[first2,first2+(last1-first1)), 利用给定的__cmp_equal(a,b) (true if equal)判断
+    // equal [first1,last1)==[first2,first2+(last1-first1)), 利用给定的 __cmp_equal (true if equal) 判断
     template<typename _Input_Iter1, typename _Input_Iter2, typename _Cmp_equal>
     inline bool
     equal(_Input_Iter1 __first1, _Input_Iter1 __last1, _Input_Iter2 __first2, _Cmp_equal __cmp_equal)
@@ -148,15 +151,248 @@ namespace my_lib
 	    return true;
 	}
 
-    // 区别比较 返回[__first1,__last1)与[__first2,first2+(last1-first1))第一个不相等位的指针
-    // 不想自己重新写一遍pair, 所以仅返回[__first1,__last1)中的指针.
-    // Finds the places in ranges which don't match
+    // 区别比较 Finds the places in ranges which don't match
+    // return [__first1, __last1) 中与 [__first2 , __first2 + (__last1 - __first1)) 第一个不相等位的迭代器
+    // 不想自己重新写一遍pair, 所以仅返回[__first1,__last1)中的迭代器.
     template<typename _Input_Iter1, typename _Input_Iter2>
     _Input_Iter1 mismatch(_Input_Iter1 __first1, _Input_Iter1 __last1, _Input_Iter2 __first2)
     {
         for (; __first1 != __last1 && *__first1 == *__first2; ++__first1, ++__first2) { }
         return __first1;
 	}
+
+    // Finds the places in ranges which don't match, 利用给定的 __cmp_equal (true if equal) 仿函数判断
+    // return [__first1, __last1) 中与 [__first2 , __first2 + (__last1 - __first1)) 第一个不相等位的迭代器
+    template<typename _Input_Iter1, typename _Input_Iter2, typename _Cmp_equal>
+    _Input_Iter1 mismatch(_Input_Iter1 __first1, _Input_Iter1 __last1, 
+                            _Input_Iter2 __first2, _Cmp_equal __cmp_equal)
+    {
+        for (; __first1 != __last1 && __cmp_equal(*__first1, *__first2); ++__first1, ++__first2) { }
+        return __first1;
+	}
+
+    // count() return [__first, __last) 中与 __value 相等的元素个数
+    template<typename _Input_Iter, typename _Tp>
+    typename iterator_traits<_Input_Iter>::difference_type
+    count(_Input_Iter __first, _Input_Iter __last, const _Tp& __value)
+    {
+        typename iterator_traits<_Input_Iter>::difference_type __n = 0;
+        for (; __first != __last ; ++__first) 
+        { if (*__first == __value) { ++__n; } }
+        return __n;
+    }
+
+    // count() return [__first, __last) 中与 __value 相等的元素个数, 利用 __cmp_equal (true if equal) 仿函数
+    template<typename _Input_Iter, typename _Tp, typename _Cmp_equal>
+    typename iterator_traits<_Input_Iter>::difference_type
+    count(_Input_Iter __first, _Input_Iter __last, const _Tp& __value, _Cmp_equal __cmp_equal)
+    {
+        typename iterator_traits<_Input_Iter>::difference_type __n = 0;
+        for (; __first != __last ; ++__first) 
+        { if (__cmp_equal(*__first, __value)) { ++__n; } }
+        return __n;
+    }
+
+    // count_if() return [__first, __last) 中 __cond == true 的元素个数, __cond() 为仿函数
+    template<typename _Input_Iter, typename _Cond>
+    typename iterator_traits<_Input_Iter>::difference_type
+    count_if(_Input_Iter __first, _Input_Iter __last, _Cond __cond)
+    {
+        typename iterator_traits<_Input_Iter>::difference_type __n = 0;
+        for (; __first != __last ; ++__first) 
+        { if (__cond(*__first)) { ++__n; } }
+        return __n;
+    }
+
+    // exist() return [__first, __last) 中是否存在与 __value 相等的元素
+    template<typename _Input_Iter, typename _Tp>
+    bool exist(_Input_Iter __first, _Input_Iter __last, const _Tp& __value)
+    {
+        for (; __first != __last ; ++__first) 
+        { if (*__first == __value) { return true; } }
+        return false;
+    }
+
+    // exist() return [__first, __last) 中是否存在与 __value 相等的元素
+    // 利用 __cmp_equal (true if equal) 仿函数
+    template<typename _Input_Iter, typename _Tp, typename _Cmp_equal>
+    bool exist(_Input_Iter __first, _Input_Iter __last, const _Tp& __value, _Cmp_equal __cmp_equal)
+    {
+        typename iterator_traits<_Input_Iter>::difference_type __n = 0;
+        for (; __first != __last ; ++__first) 
+        { if (__cmp_equal(*__first, __value)) { return true; } }
+        return false;
+    }
+
+    // exist_if() return [__first, __last) 中是否存在 __cond == true 的元素, __cond() 为仿函数
+    template<typename _Input_Iter, typename _Cond>
+    bool exist_if(_Input_Iter __first, _Input_Iter __last, _Cond __cond)
+    {
+        typename iterator_traits<_Input_Iter>::difference_type __n = 0;
+        for (; __first != __last ; ++__first) 
+        { if (__cond(*__first)) { return true; } }
+        return false;
+    }
+
+    // find() return [__first, __last) 中第一个与 __value 相等的元素的迭代器
+    template<typename _Input_Iter, typename _Tp>
+    _Input_Iter find(_Input_Iter __first, _Input_Iter __last, const _Tp& __value)
+    {
+        for (; __first != __last && *__first != __value; ++__first) { }
+        return __first;
+    }
+
+    // find() return [__first, __last) 中第一个与 __value 相等的元素的迭代器
+    // 利用 __cmp_equal (true if equal) 仿函数
+    template<typename _Input_Iter, typename _Tp, typename _Cmp_equal>
+    _Input_Iter find(_Input_Iter __first, _Input_Iter __last, const _Tp& __value, _Cmp_equal __cmp_equal)
+    {
+        for (; __first != __last && !__cmp_equal(*__first, __value); ++__first) { }
+        return __first;
+    }
+
+    // find() return [__first, __last) 中第一个 __cond == true 的元素的迭代器, __cond() 为仿函数
+    template<typename _Input_Iter, typename _Tp, typename _Cond>
+    _Input_Iter find_if(_Input_Iter __first, _Input_Iter __last, _Cond __cond)
+    {
+        for (; __first != __last && !__cond(*__first); ++__first) { }
+        return __first;
+    }
+
+    // for_each element in [__first, __last) do __function(), __function() 为仿函数
+    template<typename _Input_Iter, typename _Function>
+    _Function for_each(_Input_Iter __first, _Input_Iter __last, _Function __function)
+    {
+        for (; __first != __last; ++__first) { __function(*__first); }
+        return __function; // 通常并没有什么用, 之前__function()的返回值全丢了
+    }
+
+    // function on [__first1, __last1) to [__first1, __first2 + (__last1 - __first1))
+    // 将对 [__first1, __last1) 每一元素运算的结果存储至 [__first1, __first2 + (__last1 - __first1))
+    // __function() 为仿函数
+    template<typename _Input_Iter, typename _Forward_Iter, typename _Function>
+    _Function function_on(_Input_Iter __first1, _Input_Iter __last1, 
+                            _Forward_Iter __first2, _Function __function)
+    {
+        for (; __first1 != __last1; ++__first1, ++__first2) 
+        { *__first2 = __function(*__first1); } // 保存每一个返回值的正确示范
+        return __function;
+    }
+
+    // generate elements on [__first, __last) with __generate() 仿函数
+    template<typename _Output_Iter, typename _Generator>
+    void generate(_Output_Iter __first, _Output_Iter __last, _Generator __generate)
+    {
+        for (; __first != __last; ++__first) { *__first = __generate(); }
+    }
+
+    // generate elements on [__first, __first + __n) with __generate() 仿函数
+    template<typename _Output_Iter, typename _Generator>
+    _Output_Iter generate_n(_Output_Iter __first, size_t __n, _Generator __generate)
+    {
+        for (; __n > 0; --__n, ++__first) { *__first = __generate(); }
+        return __first;
+    }
+
+    // min_element in [__first, __last) 获得 [__first, __last) 中的最小值
+    template<typename _Forward_Iter>
+    _Forward_Iter min_element(_Forward_Iter __first, _Forward_Iter __last)
+    {
+        _Forward_Iter __result = __first;
+        for (; __first != __last; ++__first) 
+        { if (*__first < *__result) { __result = __first; } }
+        return __result;
+    }
+
+    // min_element in [__first, __last) 获得 [__first, __last) 中的最小值 
+    // __comp(a,b) == true if a < b, __comp() 为仿函数
+    template<typename _Forward_Iter, typename _Comp>
+    _Forward_Iter min_element(_Forward_Iter __first, _Forward_Iter __last, _Comp __comp)
+    {
+        _Forward_Iter __result = __first;
+        for (; __first != __last; ++__first) 
+        { if (__comp(*__result, *__first)) { __result = __first; } }
+        return __result;
+    }
+
+    // max_element in [__first, __last) 获得 [__first, __last) 中的最大值
+    template<typename _Forward_Iter>
+    _Forward_Iter max_element(_Forward_Iter __first, _Forward_Iter __last)
+    {
+        _Forward_Iter __result = __first;
+        for (; __first != __last; ++__first) 
+        { if (*__first > *__result) { __result = __first; } }
+        return __result;
+    }
+
+    // max_element in [__first, __last) 获得 [__first, __last) 中的最大值 
+    // __comp(a,b) == true if a < b, __comp() 为仿函数
+    template<typename _Forward_Iter, typename _Comp>
+    _Forward_Iter max_element(_Forward_Iter __first, _Forward_Iter __last, _Comp __comp)
+    {
+        _Forward_Iter __result = __first;
+        for (; __first != __last; ++__first) 
+        { if (!__comp(*__result, *__first)) { __result = __first; } }
+        return __result;
+    }
+
+    // replace __old_value in [__first, __last) by __new_value
+    // 将 [__first, __last) 中的 __old_value 替换为 __new_value
+    template<typename _Forward_Iter, typename _Tp>
+    void replace(_Forward_Iter __first, _Forward_Iter __last, 
+                    const _Tp& __old_value, const _Tp& __new_value)
+    {
+        for (; __first != __last; ++__first) 
+        { if (*__first == __old_value) { *__first = __new_value; } }
+    }
+
+    // replace __old_value in [__first, __last) by __new_value then copy to __result
+    // 将 [__first, __last) 中的 __old_value 替换为 __new_value
+    // 不改变原序列的值, 而将替换后的序列复制到 __result 处
+    template<typename _Input_Iter, typename _Output_Iter, typename _Tp>
+    _Output_Iter replace_copy(_Input_Iter __first, _Input_Iter __last, _Output_Iter __result,
+                                const _Tp& __old_value, const _Tp& __new_value)
+    {
+        for (; __first != __last; ++__first, ++__result) 
+        { *__result = *__first == __old_value ? __new_value : *__first; }
+        return __result;
+    }
+
+    // replace elements in [__first, __last) whose __cond == true by __new_value
+    // 将 [__first, __last) 中 __cond == true 的元素替换为 __new_value, __cond() 为仿函数
+    template<typename _Forward_Iter, typename _Tp, typename _Cond>
+    void replace_if(_Forward_Iter __first, _Forward_Iter __last, _Cond __cond, const _Tp& __new_value)
+    {
+        for (; __first != __last; ++__first) 
+        { if (__cond(*__first)) { *__first = __new_value; } }
+    }
+
+    // replace elements in [__first, __last) whose __cond == true by __new_value then copy to __result
+    // 将 [__first, __last) 中 __cond == true 的元素替换为 __new_value, __cond() 为仿函数
+    // 不改变原序列的值, 而将替换后的序列复制到 __result 处
+    template<typename _Input_Iter, typename _Output_Iter, typename _Tp, typename _Cond>
+    _Output_Iter replace_copy_if(_Input_Iter __first, _Input_Iter __last, _Output_Iter __result,
+                                _Cond __cond, const _Tp& __new_value)
+    {
+        for (; __first != __last; ++__first, ++__result) 
+        { *__result = __cond(*__first) ? __new_value : *__first; }
+        return __result;
+    }
+
+    // select elements in [__first, __last) whose __cond == true and copy to __result
+    // 将 [__first, __last) 中 __cond == true 的元素复制到 __result, __cond() 为仿函数
+    template<typename _Input_Iter, typename _Output_Iter, typename _Tp, typename _Cond>
+    _Output_Iter select(_Input_Iter __first, _Input_Iter __last, _Output_Iter __result, _Cond __cond)
+    {
+        // 注意原本在 [__first, __last) 中可能离散的值复制后连续化了!
+        for (; __first != __last; ++__first) 
+        { if (__cond(*__first)) { *__result = __first; ++__result; } }
+        return __result;
+    }
+
+
+
+
 
 
     // 内存处理函数, 仅处理内存, 不构造对象!
@@ -336,7 +572,7 @@ namespace my_lib
     template<typename _Input_Iter, typename _Output_Iter>
     struct _copy_dispatch_aux
     {
-        //《STL源码剖析》通过重载operator()实现第三级的特化
+        //《STL源码剖析》通过operator()仿函数实现第三级的特化
         _Output_Iter operator()(_Input_Iter __first, _Input_Iter __last, _Output_Iter __result)
         {
             // 通过临时对象实现参数自动推导
@@ -481,4 +717,4 @@ namespace my_lib
 } // namespace my_lib
 
 
-#endif
+#endif // MY_ALGOBASE
