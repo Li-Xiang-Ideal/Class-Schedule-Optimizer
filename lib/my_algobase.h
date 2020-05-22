@@ -420,7 +420,7 @@ namespace my_lib
         }
     };
     
-    // fill [__first,__last) with value
+    // fill [__first,__last) with __value
     template<typename _Forward_Iter, typename _Tp>
     void fill(_Forward_Iter __first, _Forward_Iter __last, const _Tp& __value) 
     {
@@ -428,11 +428,11 @@ namespace my_lib
         __fill_aux<_Category>::__fill(__first, __last, __value);
     }
 
-    // fill [__first,__first + __n) with value, return __first + __n
+    // fill [__first,__first + __n) with __value, return __first + __n
     template<typename _Forward_Iter, typename _Tp>
-    _Forward_Iter fill_n(_Forward_Iter __first, size_t __n, const _Tp& value) 
+    _Forward_Iter fill_n(_Forward_Iter __first, size_t __n, const _Tp& __value) 
     {
-        for (; __n > 0 ; --__n, ++__first) { *__first = value; }
+        for (; __n > 0 ; --__n, ++__first) { *__first = __value; }
         return __first;
     }
 
@@ -641,7 +641,7 @@ namespace my_lib
         __copy_backward(_Bidirectional_Iter1 __first, _Bidirectional_Iter1 __last, 
                         _Bidirectional_Iter2 __result)
         {
-            for (; __first != __last ; --__last, --__result) { *__result = *__last; }
+            for (; __first != __last ; --__last, --__result) { *--__result = *--__last; }
             return __result;
         }
     };
@@ -683,7 +683,7 @@ namespace my_lib
         {
             typename iterator_traits<_Random_Access_Iter>::difference_type __n;
             for (__n = __last - __first; __n > 0 ; --__n, --__last, --__result) 
-            { *__result = *__last; }
+            { *--__result = *--__last; }
             return __result;
         }
     };
