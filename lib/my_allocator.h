@@ -50,6 +50,7 @@
 
 #include "my_type_traits.h"
 #include "my_iterator.h"
+#include "my_move.h"
 #include "my_alloc_mem.h"
 
 #define USE_SUB_ALLOCATOR
@@ -86,9 +87,14 @@ namespace my_lib
 	{ ::new((void *)__p) _Tp1(); }
 
     // construct的实现, 直接调用对象的有参构造函数
+    template<typename _Tp1>
+    inline void _construct(_Tp1* __p, const _Tp1& __val)
+	{ ::new((void *)__p) _Tp1(__val); }
+
+    // construct的实现, 直接调用对象的有参构造函数
     template<typename _Tp1, typename... _Vals>
     inline void _construct(_Tp1* __p, _Vals&&... __vals)
-	{ ::new((void *)__p) _Tp1(std::forward<_Vals>(__vals)...); }
+	{ ::new((void *)__p) _Tp1(my_lib::forward<_Vals>(__vals)...); }
 
     // destroy的简单实现, 直接调用对象的析构函数
     template <typename _Tp>
@@ -157,9 +163,14 @@ namespace my_lib
 	{ ::new((void *)__p) _Tp1(); }
 
     // construct的实现, 直接调用对象的有参构造函数
-    template<typename _Tp1, typename... _Vals>
-    inline void _construct(_Tp1* __p, _Vals&&... __vals)
-	{ ::new((void *)__p) _Tp1(std::forward<_Vals>(__vals)...); }
+    template<typename _Tp1>
+    inline void _construct(_Tp1* __p, const _Tp1& __val)
+	{ ::new((void *)__p) _Tp1(__val); }
+
+    // construct的实现, 直接调用对象的有参构造函数
+    //template<typename _Tp1, typename... _Vals>
+    //inline void _construct(_Tp1* __p, _Vals&&... __vals)
+	//{ ::new((void *)__p) _Tp1(std::forward<_Vals>(__vals)...); }
 
     // destroy的实现, 直接调用对象的析构函数
     template <typename _Tp>
@@ -185,7 +196,7 @@ namespace my_lib
         template <typename _Tp1>
         allocator(const allocator<_Tp1>&) { }
 
-        // rebind allocator of type _Tp1
+        // rebind allocator of type _Tp1 通过rebind可以获得当前所用配置器的类模板
         template<typename _Tp1>
         struct rebind
         { typedef allocator<_Tp1> other; };
@@ -226,6 +237,7 @@ namespace my_lib
 
 #if __cplusplus >= 201103L
         void construct(pointer _p) { _construct(_p); }
+        void construct(pointer _p, const _Tp& _Arg) { _construct(_p, _Arg); }
 
         template<typename... _Args>
         void construct(pointer _p, const _Args&&... __args) { _construct(_p, __args...); }
