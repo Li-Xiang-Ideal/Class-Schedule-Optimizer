@@ -1,7 +1,7 @@
 /**********************************************************
  * 
  *                        My Lib 
- *                      my_alloc.h
+ *                    my_allocator.h
  * 
  *               Copyright (C) 2020 李想
  * Released under the GNU General Public License Version 3
@@ -17,37 +17,43 @@
 
 /************************************************************
  * 说明: 
- * 本文件包含一个空间配置器, 对_has_trivial_destructor进行了优
- * 化. 二级空间配置器待添加. 
+ * 本文件包含一个空间配置器, 针对_has_trivial_destructor进行了
+ * 优化, 并进行了相对详尽的注释以备温习或查阅. 对小于128bytes的
+ * 片段使用二级空间配置器. 部分代码相比STL进行了少量调整. 
  * 本文件参考了侯捷《STL源码剖析》, 特此说明并致谢
  ***********************************************************/
 
 /************************************************************
  * 更新日志:
- * 2020.04.14 对_has_trivial_destructor进行了优化
+ * 2020.04.14 针对_has_trivial_destructor进行了优化
  * 2020.05.02 对部分代码进行了调整
+ * 2020.05.04 重写了_destroy(), 提高了代码效率
+ * 2020.05.17 添加了二级空间配置器sub_allocator
+ * 2020.05.19 添加了operator==与!=, 提高了兼容性
  ***********************************************************/
 
-#ifndef MY_ALLOC
-#define MY_ALLOC
+#ifndef MY_ALLOCATOR
+#define MY_ALLOCATOR
 
 #include <new>
-/*
-#include <cstddef>
 #include <cstdlib>
-#include <cstdio>
-#include <climits>
 #include <iostream>
-#include <memory> //*/
 #include <bits/c++config.h>
 #include <bits/functexcept.h>
-#include <bits/move.h>
+
+//#include <bits/move.h>
+//#include <bits/postypes.h>
+//#include <memory>
 #if __cplusplus >= 201103L
 //#include <type_traits>
 #endif
 
 #include "my_type_traits.h"
 #include "my_iterator.h"
+#include "my_move.h"
+#include "my_alloc_mem.h"
+
+#define USE_SUB_ALLOCATOR
 
 namespace my_lib
 {
@@ -81,9 +87,14 @@ namespace my_lib
 	{ ::new((void *)__p) _Tp1(); }
 
     // construct的实现, 直接调用对象的有参构造函数
+    template<typename _Tp1>
+    inline void _construct(_Tp1* __p, const _Tp1& __val)
+	{ ::new((void *)__p) _Tp1(__val); }
+
+    // construct的实现, 直接调用对象的有参构造函数
     template<typename _Tp1, typename... _Vals>
     inline void _construct(_Tp1* __p, _Vals&&... __vals)
-	{ ::new((void *)__p) _Tp1(std::forward<_Vals>(__vals)...); }
+	{ ::new((void *)__p) _Tp1(my_lib::forward<_Vals>(__vals)...); }
 
     // destroy的简单实现, 直接调用对象的析构函数
     template <typename _Tp>
@@ -110,7 +121,7 @@ namespace my_lib
     }; //注意这里用bool完成推断, 而非直接使用__true_type, 原因将在下文介绍*/
 
 
-    /*destroy的实现之二, 使用函数参数类型推断
+    /* destroy的实现之二, 使用函数参数类型推断
 
     // destroy的实现, 对象有非平凡析构函数之偏特化
     template<typename _ForwardIterator>
@@ -129,7 +140,7 @@ namespace my_lib
         typedef typename iterator_traits<_ForwardIterator>::value_type _Value_type;
         //以下实现使用了类模板参数类型推断
         _destroy_aux<has_trivial_destructor<_Value_type>::value>::__destroy(_first, _last);
-        /*不能使用以下方法: 在_destroy_aux处使用__true_type推断, 而这里使用
+        /*不能使用以下方法: 在_destroy_aux处使用__true_type推断, 而在这里使用如下代码:
         _destroy_aux<has_trivial_destructor<_Value_type>>::__destroy(_first, _last);
         原因在于编译器会在_destroy_aux<...>处直接推断为non-trivial, 
         而不会先推断has_trivial_destructor<_Value_type>再推断_destroy_aux<...>*/
@@ -141,6 +152,10 @@ namespace my_lib
         __destroy(_first, _last, _has_trivial_destructor(_Value_type())); /* 括号用于生成临时对象 */
     }
 
+    // STL对char*与wchar_t*设计了特化的_destroy(), 此处模仿之设置char*与wchar_t*的特化
+    inline void _destroy(char*, char*) { }
+    inline void _destroy(wchar_t*, wchar_t*) { }
+
 #else
     // construct的实现, 直接调用对象的无参构造函数
     template<typename _Tp1>
@@ -148,9 +163,14 @@ namespace my_lib
 	{ ::new((void *)__p) _Tp1(); }
 
     // construct的实现, 直接调用对象的有参构造函数
-    template<typename _Tp1, typename... _Vals>
-    inline void _construct(_Tp1* __p, _Vals&&... __vals)
-	{ ::new((void *)__p) _Tp1(std::forward<_Vals>(__vals)...); }
+    template<typename _Tp1>
+    inline void _construct(_Tp1* __p, const _Tp1& __val)
+	{ ::new((void *)__p) _Tp1(__val); }
+
+    // construct的实现, 直接调用对象的有参构造函数
+    //template<typename _Tp1, typename... _Vals>
+    //inline void _construct(_Tp1* __p, _Vals&&... __vals)
+	//{ ::new((void *)__p) _Tp1(std::forward<_Vals>(__vals)...); }
 
     // destroy的实现, 直接调用对象的析构函数
     template <typename _Tp>
@@ -176,7 +196,7 @@ namespace my_lib
         template <typename _Tp1>
         allocator(const allocator<_Tp1>&) { }
 
-        // rebind allocator of type _Tp1
+        // rebind allocator of type _Tp1 通过rebind可以获得当前所用配置器的类模板
         template<typename _Tp1>
         struct rebind
         { typedef allocator<_Tp1> other; };
@@ -187,6 +207,7 @@ namespace my_lib
         typedef std::true_type propagate_on_container_move_assignment;
 #endif
 
+#ifndef USE_SUB_ALLOCATOR
         // allocate, deallocate, construct和destroy函数均调用上面的实际实现
         // hint used for locality. ref.[Austern],p189
         pointer allocate(size_type _n, const void* hint = 0) {
@@ -194,8 +215,29 @@ namespace my_lib
         }
         void deallocate(pointer _p, size_type _n) { _deallocate(_p); }
 
+#else
+        // Enable sub_allocator for size<=128bytes
+        
+        // allocate函数, 调用_allocate()或sub_allocator
+        pointer allocate(size_type _n, const void* hint = 0) 
+        {
+            if (_n * sizeof(value_type) > 128) 
+            { return _allocate((difference_type)_n, (pointer)0); }
+            else { return _sub_allocate((difference_type)_n, (pointer)0); }
+        }
+
+        // deallocate函数, 调用_deallocate()或sub_allocator
+        void deallocate(pointer _p, size_type _n) 
+        { 
+            if (_n * sizeof(value_type) > 128)  { _deallocate(_p);  }
+            else { _sub_deallocate(_p, _n); }
+        }
+        
+#endif
+
 #if __cplusplus >= 201103L
         void construct(pointer _p) { _construct(_p); }
+        void construct(pointer _p, const _Tp& _Arg) { _construct(_p, _Arg); }
 
         template<typename... _Args>
         void construct(pointer _p, const _Args&&... __args) { _construct(_p, __args...); }
@@ -211,11 +253,34 @@ namespace my_lib
         void destroy(pointer _p) { _destroy(_p); }
 #endif
 
-        pointer address(reference _x) const { return (pointer)&_x; }
-        const_pointer const_address(const_reference _x) { return (const_pointer)&_x; }
-
-        size_type max_size() const { return size_type(UINT_MAX / sizeof(_Tp)); }   
+        pointer address(reference _x) const _GLIBCXX_NOEXCEPT { return (pointer)&_x; }
+        const_pointer const_address(const_reference _x) const _GLIBCXX_NOEXCEPT 
+        { return (const_pointer)&_x; }
+        size_type max_size() const _GLIBCXX_NOEXCEPT { return size_type(UINT_MAX / sizeof(_Tp)); }   
     };
-} // namespace my_alloc
 
-#endif // MY_ALLOC
+    // 以下代码在STL的许多库(如vector.tcc)中有用, 不可删去
+    // allocator_always_compares_equal, 所有my_lib::allocator都相等
+    template<typename _T1, typename _T2>
+    inline bool
+    operator==(const allocator<_T1>&, const allocator<_T2>&)
+    { return true; }
+
+    template<typename _Tp>
+    inline bool
+    operator==(const allocator<_Tp>&, const allocator<_Tp>&)
+    { return true; }
+
+    template<typename _T1, typename _T2>
+    inline bool
+    operator!=(const allocator<_T1>&, const allocator<_T2>&)
+    { return false; }
+
+    template<typename _Tp>
+    inline bool
+    operator!=(const allocator<_Tp>&, const allocator<_Tp>&)
+    { return false; }
+
+} // namespace my_lib
+
+#endif // MY_ALLOCATOR
