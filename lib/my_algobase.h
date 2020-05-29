@@ -38,6 +38,8 @@
 
 #include "my_type_traits.h"
 #include "my_iterator.h"
+//#include "my_move.h"
+
 
 namespace my_lib
 {
@@ -294,6 +296,34 @@ namespace my_lib
         return __first;
     }
 
+    // lexicographical one-by-one conpare [__first1, __last1) with [__first2, __last2) 
+    // 按字典排序逐位比较两个区间
+    template<typename _Input_Iter>
+    bool lexicographical_compare(_Input_Iter __first1, _Input_Iter __last1, 
+                                    _Input_Iter __first2, _Input_Iter __last2)
+    {
+        for (; __first1 != __last1 && __first2 != __last2; ++__first1, ++__first2)
+        {
+            if (*__first1 < *__first2) { return true; }
+            if (*__first1 > *__first2) { return true; }
+        }
+        return __first1 == __last1 && __first2 != __last2;
+    }
+
+    // lexicographical one-by-one conpare [__first1, __last1) with [__first2, __last2) 
+    // 按字典排序逐位比较两个区间, __comp(a,b) == true if a < b, __comp() 为仿函数
+    template<typename _Input_Iter, typename _Comp>
+    bool lexicographical_compare(_Input_Iter __first1, _Input_Iter __last1, 
+                                    _Input_Iter __first2, _Input_Iter __last2, _Comp __comp)
+    {
+        for (; __first1 != __last1 && __first2 != __last2; ++__first1, ++__first2)
+        {
+            if (__comp(*__first1, *__first2)) { return true; }
+            if (__comp(*__first1, *__first2)) { return true; }
+        }
+        return __first1 == __last1 && __first2 != __last2;
+    }
+
     // min_element in [__first, __last) 获得 [__first, __last) 中的最小值
     template<typename _Forward_Iter>
     _Forward_Iter min_element(_Forward_Iter __first, _Forward_Iter __last)
@@ -446,7 +476,7 @@ namespace my_lib
         *__b = tmp;
 	}
 
-    // swap, swap &__a <=> &__b
+    // swap, swap __a <=> __b
     template<typename _Tp>
     inline void swap(_Tp& __a, _Tp& __b)
     {
@@ -454,6 +484,15 @@ namespace my_lib
         __a = __b;
         __b = tmp;
 	}
+
+    // swap, swap __a[_Nm] <=> __b[_Nm]
+    template<typename _Tp, size_t _Nm>
+    inline void
+    swap(_Tp (&__a)[_Nm], _Tp (&__b)[_Nm])
+    {
+        for (size_t __n = 0; __n < _Nm; ++__n)
+	    { swap(__a[__n], __b[__n]); }
+    }
 
 
     // 内存处理函数 Copy [__first,__last) into __result
@@ -489,8 +528,8 @@ namespace my_lib
         __copy(_Random_Access_Iter __first, _Random_Access_Iter __last, _Output_Iter __result)
         {
             typedef typename iterator_traits<_Random_Access_Iter>::value_type value_type;
-            // 通过*(&Iterator)保证所取地址是迭代器指向的对象的地址, 而非迭代器本身的地址
-            __builtin_memmove(*(&__result), *(&__first), sizeof(value_type) * (__last - __first));
+            // 通过&(*Iterator)保证所取地址是迭代器指向的对象的地址, 而非迭代器本身的地址
+            __builtin_memmove(&(*__result), &(*__first), sizeof(value_type) * (__last - __first));
             return __result + (__last - __first);
         }
     };
@@ -665,8 +704,8 @@ namespace my_lib
                         _Bidirectional_Iter __result)
         {
             typedef typename iterator_traits<_Random_Access_Iter>::value_type value_type;
-            // 通过*(&Iterator)保证所取地址是迭代器指向的对象的地址, 而非迭代器本身的地址
-            __builtin_memmove(*(&(__result - (__last - __first))), *(&__first), 
+            // 通过&(*Iterator)保证所取地址是迭代器指向的对象的地址, 而非迭代器本身的地址
+            __builtin_memmove(&(*(__result - (__last - __first))), &(*__first), 
                                 sizeof(value_type) * (__last - __first));
             return __result - (__last - __first);
         }
@@ -712,6 +751,13 @@ namespace my_lib
     {
         __builtin_memmove(__result - (__last - __first), __first, sizeof(wchar_t*) * (__last - __first));
         return __result - (__last - __first);
+    }
+
+    // 内存处理函数 Move [__first,__last) to [__result + (__last - __first), __result)
+    template<typename _Input_Iter, typename _Output_Iter>
+    inline _Output_Iter move(_Input_Iter __first, _Input_Iter __last, _Output_Iter __result)
+    {
+        return copy(__first, __last, __result);
     }
     
 } // namespace my_lib
