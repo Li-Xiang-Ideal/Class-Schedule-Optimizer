@@ -169,7 +169,7 @@ namespace my_lib
     inline typename iterator_traits<_Forward_Iterator>::difference_type
     __distance(_Forward_Iterator first, _Forward_Iterator last, random_access_iterator_tag) 
     {
-	    return last - first;
+	    return &(*last) - &(*first);
     }
 
     //distance between first and last的实现, 识别iterator_category
