@@ -37,6 +37,7 @@
 #include <bits/c++config.h>
 #include <bits/functexcept.h>
 
+#include "my_move.h"
 #include "my_algobase.h"
 
 #define USE_SUB_ALLOCATOR_STAT
@@ -338,9 +339,13 @@ namespace my_lib
     template<typename _Tp>
     class sub_allocator
     {
-        typedef _Tp                 value_type;
+        typedef size_t              size_type;
+        typedef ptrdiff_t           difference_type;
         typedef _Tp*                pointer;
+        typedef const _Tp*          const_pointer;
         typedef _Tp&                reference;
+        typedef const _Tp&          const_reference;
+        typedef _Tp                 value_type;
         typedef allocator_memory    _Alloc;
 
     public:
@@ -371,6 +376,6 @@ namespace my_lib
 
 #undef SUB_ALLOC_SIZE
 
-#undef max
+//#undef max
 
 #endif // MY_ALLOC_MEM
