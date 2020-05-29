@@ -25,6 +25,7 @@
 /************************************************************
  * 更新日志:
  * 2020.05.21 添加了部分功能函数
+ * 2020.05.24 添加了部分功能函数
  ***********************************************************/
 
 #ifndef MY_UNINITIALIZED
@@ -36,8 +37,9 @@
 
 #include "my_type_traits.h"
 #include "my_iterator.h"
+#include "my_move.h"
 #include "my_algobase.h"
-#include "my_allocator.h"
+#include "my_alloc_traits.h"
 
 namespace my_lib
 {
@@ -67,7 +69,7 @@ namespace my_lib
 		}
     };
 
-	// Fill [__fiset, __fiset + __n) with construct(pointer, __value)
+	// Fill [__first, __first + __n) with construct(pointer, __value)
 	template<typename _Forward_Iter, typename _Tp>
     inline _Forward_Iter
     uninitialized_fill_n(_Forward_Iter __first, size_t __n, const _Tp& __value)
@@ -79,7 +81,7 @@ namespace my_lib
 		__uninitialized_fill_n(__first, __n, __value); 
 	}
 
-	// Fill [__fiset, __fiset + __n) with __value for char 特化
+	// Fill [__first, __first + __n) with __value for char 特化
     inline char* uninitialized_fill_n(char* __first, size_t __n, const char& __value)
     {
 		// 对char可用内建函数增加效率
@@ -112,7 +114,7 @@ namespace my_lib
 		}
     };
 
-	// Fill [__fiset, __last) with construct(pointer, __value)
+	// Fill [__first, __last) with construct(pointer, __value)
 	template<typename _Forward_Iter, typename _Tp>
     inline void
     uninitialized_fill(_Forward_Iter __first, _Forward_Iter __last, const _Tp& __value)
@@ -122,7 +124,7 @@ namespace my_lib
 		__uninitialized_fill(__first, __last, __value); 
 	}
 
-	// Fill [__fiset, __last) with __value for char 特化
+	// Fill [__first, __last) with __value for char 特化
     inline void uninitialized_fill(char* __first, char* __last, const char& __value)
     {
 		__builtin_memset(__first, __value, __last - __first);
@@ -154,29 +156,121 @@ namespace my_lib
 		}
     };
 
-	// Copy [__fiset, __last) into __result with constructor
+	// Copy [__first, __last) into __result with constructor
 	template<typename _Input_Iter, typename _Forward_Iter>
     inline _Forward_Iter
-    uninitialized_fill(_Input_Iter __first, _Input_Iter __last, _Forward_Iter __result)
+    uninitialized_copy(_Input_Iter __first, _Input_Iter __last, _Forward_Iter __result)
     { 
 		typedef typename iterator_traits<_Forward_Iter>::value_type value_type;
 		return __uninitialized_copy_aux<is_POD_type<value_type>::value>::\
 		__uninitialized_copy(__first, __last, __result); 
 	}
 
-	// Copy [__fiset, __last) into __result for char 特化
+	// Copy [__first, __last) into __result for char 特化
     inline char* uninitialized_copy(char* __first, char* __last, char* __result)
     {
 		__builtin_memmove(__result, __first, __last - __first);
 		return __result + (__last - __first);
 	}
 
-	// Copy [__fiset, __last) into __result for wchar_t 特化
+	// Copy [__first, __last) into __result for wchar_t 特化
     inline wchar_t* uninitialized_copy(wchar_t* __first, wchar_t* __last, wchar_t* __result)
     {
 		__builtin_memmove(__result, __first, sizeof(wchar_t) * (__last - __first));
 		return __result + (__last - __first);
 	}
+
+	
+	// Copy [__first, __last) into __result using _Alloc
+	template<typename _Input_Iter, typename _Forward_Iter, typename _Alloc>
+    _Forward_Iter
+    __uninitialized_copy_a(_Input_Iter __first, _Input_Iter __last, 
+							_Forward_Iter __result, _Alloc& __alloc)
+    { 
+        _Forward_Iter __cur = __result;
+        __try
+	    {
+			typedef alloc_traits<_Alloc> __traits;
+	  		for (; __first != __last; ++__first, ++__cur)
+	    	__traits::construct(__alloc, __addressof(*__cur), *__first);
+	  		return __cur;
+		}
+    	__catch(...)
+		{
+	  		_Destroy(__result, __cur, __alloc);
+	  		__throw_exception_again;
+		}
+    }
+
+	// Copy [__first, __last) into __result using my_lib::allocator
+    template<typename _Input_Iter, typename _Forward_Iter, typename _Tp>
+    inline _Forward_Iter
+    __uninitialized_copy_a(_Input_Iter __first, _Input_Iter __last,
+			   				_Forward_Iter __result, allocator<_Tp>&)
+    { return uninitialized_copy(__first, __last, __result); }
+
+
+	// Fill [__first, __last) with __x using _Alloc
+	template<typename _Forward_Iter, typename _Tp, typename _Alloc>
+    void
+    __uninitialized_fill_a(_Forward_Iter __first, _Forward_Iter __last, const _Tp& __x, _Alloc& __alloc)
+    {
+      	_Forward_Iter __cur = __first;
+      	__try
+		{
+	  		typedef alloc_traits<_Alloc> __traits;
+	  		for (; __cur != __last; ++__cur)
+	    	__traits::construct(__alloc, _addressof(*__cur), __x);
+		}
+      	__catch(...)
+		{
+	  		_Destroy(__first, __cur, __alloc);
+	  		__throw_exception_again;
+		}
+    }
+
+	// Fill [__first, __last) with __x using my_lib::allocator
+  	template<typename _Forward_Iter, typename _Tp, typename _Tp2>
+    inline void
+    __uninitialized_fill_a(_Forward_Iter __first, _Forward_Iter __last, const _Tp& __x, allocator<_Tp2>&)
+    { uninitialized_fill(__first, __last, __x); }
+
+	// Fill [__first, __first + __n) with __x using _Alloc
+	template<typename _Forward_Iter, typename _Size, typename _Tp, typename _Alloc>
+    void
+    __uninitialized_fill_n_a(_Forward_Iter __first, _Size __n, const _Tp& __x, _Alloc& __alloc)
+    {
+      	_Forward_Iter __cur = __first;
+      	__try
+		{
+	  		typedef alloc_traits<_Alloc> __traits;
+	  		for (; __n > 0; --__n, ++__cur)
+	    	__traits::construct(__alloc, _addressof(*__cur), __x);
+		}
+      	__catch(...)
+		{
+	  		_Destroy(__first, __cur, __alloc);
+	  		__throw_exception_again;
+		}
+    }
+
+	// Fill [__first, __first + __n) with __x using my_lib::allocator
+  	template<typename _Forward_Iter, typename _Size, typename _Tp, typename _Tp2>
+    inline void
+    __uninitialized_fill_n_a(_Forward_Iter __first, _Size __n, const _Tp& __x, allocator<_Tp2>&)
+    { uninitialized_fill_n(__first, __n, __x); }
+
+	// Move [__first, __last) into __result using _Alloc
+	template<typename _Input_Iter, typename _Forward_Iter, typename _Alloc>
+    inline _Forward_Iter
+    __uninitialized_move_a(_Input_Iter __first, _Input_Iter __last,
+			   				_Forward_Iter __result, _Alloc& __alloc)
+    {
+      	return __uninitialized_copy_a(_GLIBCXX_MAKE_MOVE_ITERATOR(__first),
+					 _GLIBCXX_MAKE_MOVE_ITERATOR(__last), __result, __alloc);
+    }    
+
+	
 
 	
 } // namespace my_lib
