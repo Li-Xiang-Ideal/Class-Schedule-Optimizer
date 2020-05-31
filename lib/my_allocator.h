@@ -230,7 +230,7 @@ namespace my_lib
         void deallocate(pointer _p, size_type _n) 
         { 
             if (_n * sizeof(value_type) > 128)  { _deallocate(_p);  }
-            else { _sub_deallocate(_p, _n); }
+            else { _sub_deallocate(_p, _n * sizeof(value_type)); }
         }
         
 #endif
@@ -245,6 +245,45 @@ namespace my_lib
         void destroy(pointer _p) { _destroy(_p); }
 
         template<typename _ForwardIterator>
+        void destroy(_ForwardIterator _first, _ForwardIterator _last) 
+        { _destroy(_first, _last); }
+#else
+        void construct(pointer _p) { _construct(_p); }
+        void construct(pointer _p, const _Tp& _Arg) { _construct(_p, _Arg); }
+        void destroy(pointer _p) { _destroy(_p); }
+#endif
+
+        pointer address(reference _x) const _GLIBCXX_NOEXCEPT { return (pointer)&_x; }
+        const_pointer const_address(const_reference _x) const _GLIBCXX_NOEXCEPT 
+        { return (const_pointer)&_x; }
+        size_type max_size() const _GLIBCXX_NOEXCEPT { return size_type(UINT_MAX / sizeof(_Tp)); }   
+    };
+
+    // 以下代码在STL的许多库(如vector.tcc)中有用, 不可删去
+    // allocator_always_compares_equal, 所有my_lib::allocator都相等
+    template<typename _T1, typename _T2>
+    inline bool
+    operator==(const allocator<_T1>&, const allocator<_T2>&)
+    { return true; }
+
+    template<typename _Tp>
+    inline bool
+    operator==(const allocator<_Tp>&, const allocator<_Tp>&)
+    { return true; }
+
+    template<typename _T1, typename _T2>
+    inline bool
+    operator!=(const allocator<_T1>&, const allocator<_T2>&)
+    { return false; }
+
+    template<typename _Tp>
+    inline bool
+    operator!=(const allocator<_Tp>&, const allocator<_Tp>&)
+    { return false; }
+
+} // namespace my_lib
+
+#endif // MY_ALLOCATOR    template<typename _ForwardIterator>
         void destroy(_ForwardIterator _first, _ForwardIterator _last) 
         { _destroy(_first, _last); }
 #else
